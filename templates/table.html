@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Status Table</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 80%; /* Adjust as needed */
+            margin: 20px auto; /* Center the table */
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Device Status Table</h1>
+
+    <table>
+        <thead>
+            <tr>
+                {% for label in col_labels %}
+                    <th>{{ label }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row_index in range(cell_text|length) %}
+                <tr>
+                    {% for col_index in range(col_labels|length) %}
+                        <td style="background-color: {{ colors[row_index][col_index] }};">
+                            {{ cell_text[row_index][col_index] }}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
