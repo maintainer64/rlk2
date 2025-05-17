@@ -80,97 +80,46 @@ def run_ansible_playbook(
             "success": False,
             "error": f"Unexpected error: {str(e)}"
         }
-def lab_1(vendor = "Any"):
 
-    devices = [
-        {
-            "name": "PC1",
-            "device_type": "PC",
-            "hosts": "-"
-        },
-        {
-            "name": "PC2",
-            "device_type": "PC",
-            "hosts": "-"
 
-        },
-        {
-            "name": "Switch1",
-            "device_type": "Switch",
-        },
-        {
-            "name": "Switch2",
-            "device_type": "Switch",
-        }
-    ]
+def load_lab_config(lab_number):
+    """Загружает конфигурацию лабораторной работы из файла"""
+    with open('labs_config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+        lab_key = f"lab{lab_number}"
+        if lab_key not in config['labs']:
+            raise ValueError(f"Лабораторная работа {lab_number} не найдена в конфигурации")
+        return config['labs'][lab_key]
 
-    # Топология ЛР 2
-    topology = [
-        {"source": "PC1(vlan)", "target": "Switch1(port1)"},
-        {"source": "Switch1(port2)", "target": "Switch2(port1)"},
-        {"source": "Switch2(port2)", "target": "PC2(vlan)"}
-    ]
-    vendor_index = 0
-    for dev in devices:
-        if dev["device_type"] != "PC":
-            if isinstance(vendor, str):
-                dev["vendor"] = vendor
-            elif vendor_index < len(vendor):
-                dev["vendor"] = vendor[vendor_index]
+
+def run_lab(lab_number, group_id, vendor="Any"):
+    """Запускает указанную лабораторную работу"""
+    try:
+        lab_config = load_lab_config(lab_number)
+        devices = lab_config['devices']
+        topology = lab_config['topology']
+        vendor_index = 0
+        for dev in devices:
+            if dev["device_type"] != "PC":
+                if isinstance(vendor, str):
+                    dev["vendor"] = vendor
+                elif vendor_index < len(vendor):
+                    dev["vendor"] = vendor[vendor_index]
+                else:
+                    dev["vendor"] = "Any"
+                vendor_index += 1
             else:
-                dev["vendor"] = "Any"
-            vendor_index += 1
-        else:
-            continue
-    print(devices)
-    planner(devices, topology)
-
-def lab_2(vendor = "Any"):
-
-    devices = [
-        {
-            "name": "PC1",
-            "device_type": "PC",
-            "hosts": "-"
-        },
-        {
-            "name": "PC2",
-            "device_type": "PC",
-            "hosts": "-"
-
-        },
-        {
-            "name": "Router1",
-            "device_type": "Router",
-        },
-        {
-            "name": "Router2",
-            "device_type": "Router",
+                continue
+        planner(devices, topology, group_id)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
         }
-    ]
 
-    # Топология ЛР 2
-    topology = [
-        {"source": "PC1(vlan)", "target": "Router1(port1)"},
-        {"source": "Router1(port2)", "target": "Router2(port1)"},
-        {"source": "Router2(port2)", "target": "PC2(vlan)"}
-    ]
-    vendor_index = 0
-    for dev in devices:
-        if dev["device_type"] != "PC":
-            if isinstance(vendor, str):
-                dev["vendor"] = vendor
-            elif vendor_index < len(vendor):
-                dev["vendor"] = vendor[vendor_index]
-            else:
-                dev["vendor"] = "Any"
-            vendor_index += 1
-        else:
-            continue
-    print(devices)
-    planner(devices, topology)
 
-def update_topology(devices,topology) -> bool:
+
+def update_topology(devices,topology):
     vlans = free_vm(len(topology))
     for top in topology:
         for device in devices:
@@ -195,20 +144,19 @@ def update_topology(devices,topology) -> bool:
 
 
 
-def planner(devices,topology):
-    group_id = update_bd(devices)
-    if group_id == False:
+def planner(devices,topology, group_id):
+    status = update_bd(devices, group_id)
+    if status == False:
         return False
     update_topology(devices,topology)
     if group_id != False:
         create_playbook(topology, group_id)
         run_playbook()
-def update_bd(devices) -> int:
+def update_bd(devices, group_id) -> int:
     try:
         with sqlite3.connect(db_filename) as conn:
             cursor = conn.cursor()
             cursor.execute("BEGIN TRANSACTION;")
-            group_id = max_groups_id() + 1
             for device in devices:
                 # Проверка доступности
                 if device["device_type"] != 'PC':
@@ -254,7 +202,7 @@ def update_bd(devices) -> int:
                     conn.rollback()
                     return False
             conn.commit()
-        return group_id
+        return True
     except Exception as e:
         print(f"Ошибка: {e}")
 
@@ -455,8 +403,8 @@ def clear_bd(groups_id, db_filename = 'test.db'):  # Добавим db_filename 
             clear_vlan(groups_id)
         except Exception as e:
             print(f"Ошибка при вызове clear_vlan: {e}")
-            # Решите, нужно ли продолжать или прервать выполнение
-
+            return False
+        run_playbook()
     except sqlite3.Error as e:
         print(f"Произошла ошибка при работе с базой данных: {e}")
     finally:
@@ -551,19 +499,22 @@ def api_run_lab():
         data = request.get_json()
         lab_number = data.get('lab_number')
         vendor = data.get('vendor')
+        group_id = data.get('group_id')
 
+        if not group_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'group_id is required'
+            }), 400
         if not lab_number:
             return jsonify({
                 'status': 'error',
                 'message': 'lab_number is required'
             }), 400
-
-        if lab_number == 1:
-            lab_1(vendor) if vendor else lab_1()
-            return jsonify({
-                'status': 'success',
-                'message': 'Lab 1 executed successfully'
-            })
+        if not vendor:
+            run_lab(lab_number,group_id)
+        if vendor:
+            run_lab(lab_number,group_id,vendor)
         # Add more labs here as needed
         else:
             return jsonify({
@@ -579,7 +530,8 @@ def api_run_lab():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5005)
+    #app.run(host='0.0.0.0', port=5005)
+    run_lab(1,'1')
 
 
 
@@ -591,7 +543,7 @@ if __name__ == '__main__':
 #curl -X POST -H "Content-Type: application/json" -d '{"group_id":1}' http://localhost:5000/api/clear_db
 
 #curl http://localhost:5000/api/generate_table
-#curl -X POST http://10.40.225.6:5001/api/run_lab -H "Content-Type: application/json" -d "{""lab_number"": 1}"
+#curl -X POST http://10.40.225.6:5005/api/run_lab -H "Content-Type: application/json" -d "{""lab_number"": 1}"
 #curl -X POST http://10.40.225.6:5005/api/clear_db -H "Content-Type: application/json" -d "{""group_id"": 1}"
 
 
