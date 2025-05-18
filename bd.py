@@ -1,5 +1,6 @@
-import sqlite3
 import os
+import sqlite3
+
 
 def create_and_populate_database(db_filename="test.db"):
     conn = None  # Инициализация conn вне блока try
@@ -61,6 +62,7 @@ def create_and_populate_database(db_filename="test.db"):
     finally:
         if conn:
             conn.close()
+
 
 # Пример использования:
 if __name__ == "__main__":

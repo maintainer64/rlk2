@@ -1,8 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Status Table</title>
     <style>
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 80%; /* Adjust as needed */
+            border-collapse: collapse;
+            margin: 20px auto; /* Center the table */
+        }
+
         table {
             border-collapse: collapse;
             width: 80%; /* Adjust as needed */
@@ -17,33 +30,197 @@
 
         th {
             background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        td {
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        .device-info p {
+            margin: 10px 0;
+        }
+
+        .device-info strong {
+            display: inline-block;
+            width: 100px;
         }
     </style>
 </head>
 <body>
+<h1>Device Status Table</h1>
 
-    <h1>Device Status Table</h1>
+<table id="device-table">
+    <thead>
+    <tr id="table-headers"></tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+</table>
 
-    <table>
-        <thead>
-            <tr>
-                {% for label in col_labels %}
-                    <th>{{ label }}</th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for row_index in range(cell_text|length) %}
-                <tr>
-                    {% for col_index in range(col_labels|length) %}
-                        <td style="background-color: {{ colors[row_index][col_index] }};">
-                            {{ cell_text[row_index][col_index] }}
-                        </td>
-                    {% endfor %}
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div id="loading">Loading device data...</div>
 
+<!-- Modal for device details -->
+<div id="deviceModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">Device Details</h2>
+        <div class="device-info">
+            <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+            <p><strong>IP Address:</strong> <span id="modalIp"></span></p>
+            <p><strong>MAC Address:</strong> <span id="modalMac"></span></p>
+            <p><strong>Model:</strong> <span id="modalModel"></span></p>
+            <p><strong>Type:</strong> <span id="modalType"></span></p>
+            <p><strong>Description:</strong> <span id="modalDescription"></span></p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Elements
+        const tableHeaders = document.getElementById('table-headers');
+        const tableBody = document.getElementById('table-body');
+        const loadingElement = document.getElementById('loading');
+        const modal = document.getElementById('deviceModal');
+        const closeBtn = document.querySelector('.close');
+
+        // Event listeners
+        closeBtn.addEventListener('click', closeModal);
+        window.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        loadTableData();
+
+        function loadTableData() {
+            fetch(`/api/devices`).then(
+                response => response.json()
+            ).then(
+                data => renderTable(data)
+            ).catch(error => console.error('Error loading data:', error));
+        }
+
+        setInterval(() => {
+            loadTableData()
+        }, 1500)
+
+        function renderTable(data) {
+            loadingElement.style.display = 'none';
+
+            // Clear existing content
+            tableHeaders.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            // Add headers
+            data.table.headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                tableHeaders.appendChild(th);
+            });
+
+            // Add rows
+            data.table.rows.forEach(row => {
+                const tr = document.createElement('tr');
+
+                row.cells.forEach((cell, index) => {
+                    const td = document.createElement('td');
+
+                    // First column (device name) gets click handler and stores data
+                    const cellContent = document.createElement('div');
+                    cellContent.style.display = 'flex';
+                    cellContent.style.alignItems = 'center';
+                    cellContent.style.padding = '8px';
+                    cellContent.style.backgroundColor = cell.backgroundColor;
+
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = cell.text;
+
+                    cellContent.appendChild(textSpan);
+                    td.appendChild(cellContent);
+                    td.dataset.component_type = cell?.component_type || '';
+                    td.dataset.model = cell?.model || '';
+                    td.dataset.ip = cell?.ip || '';
+                    td.dataset.mac = cell?.mac || '';
+                    td.dataset.status = cell?.status || '';
+                    td.dataset.description = cell?.description || '';
+                    td.dataset.deviceName = cell?.text || '';
+                    td.dataset.statusColor = cell?.backgroundColor || '';
+                    td.addEventListener('click', function () {
+                        showModal(this);
+                    });
+                    tr.appendChild(td);
+                });
+
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function showModal(cellElement) {
+            document.getElementById('modalTitle').textContent = cellElement.dataset.deviceName;
+            document.getElementById('modalStatus').textContent = cellElement.dataset.status;
+            document.getElementById('modalStatus').style.color = cellElement.dataset.statusColor;
+            document.getElementById('modalModel').textContent = cellElement.dataset.model;
+            document.getElementById('modalType').textContent = cellElement.dataset.component_type;
+            document.getElementById('modalIp').textContent = cellElement.dataset.ip;
+            document.getElementById('modalMac').textContent = cellElement.dataset.mac;
+            document.getElementById('modalDescription').textContent = cellElement.dataset.description;
+
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+    });
+</script>
 </body>
 </html>
