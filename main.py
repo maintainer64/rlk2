@@ -1,18 +1,16 @@
 import os
-import re
 import sqlite3
 import subprocess
+from typing import List, Dict, Tuple, Union
 
-import pandas as pd
+import matplotlib.colors as mcolors
 import yaml
 from flask import Flask, jsonify, request, render_template
-from typing import List, Dict, Optional, Tuple, Union
-import matplotlib.colors as mcolors
 
 db_filename = 'test.db'
 
 app = Flask(__name__)
-global group_id
+
 
 def run_ansible_playbook(
         playbook_path: str,
@@ -92,34 +90,27 @@ def load_lab_config(lab_number):
         return config['labs'][lab_key]
 
 
-def run_lab(lab_number, group_id, vendor="Any"):
+def run_lab(lab_number, group_id, vendor="Any") -> bool:
     """Запускает указанную лабораторную работу"""
-    try:
-        lab_config = load_lab_config(lab_number)
-        devices = lab_config['devices']
-        topology = lab_config['topology']
-        vendor_index = 0
-        for dev in devices:
-            if dev["device_type"] != "PC":
-                if isinstance(vendor, str):
-                    dev["vendor"] = vendor
-                elif vendor_index < len(vendor):
-                    dev["vendor"] = vendor[vendor_index]
-                else:
-                    dev["vendor"] = "Any"
-                vendor_index += 1
+    lab_config = load_lab_config(lab_number)
+    devices = lab_config['devices']
+    topology = lab_config['topology']
+    vendor_index = 0
+    for dev in devices:
+        if dev["device_type"] != "PC":
+            if isinstance(vendor, str):
+                dev["vendor"] = vendor
+            elif vendor_index < len(vendor):
+                dev["vendor"] = vendor[vendor_index]
             else:
-                continue
-        planner(devices, topology, group_id)
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Unexpected error: {str(e)}"
-        }
+                dev["vendor"] = "Any"
+            vendor_index += 1
+        else:
+            continue
+    return planner(devices, topology, group_id)
 
 
-
-def update_topology(devices,topology):
+def update_topology(devices, topology):
     vlans = free_vm(len(topology))
     for top in topology:
         for device in devices:
@@ -143,15 +134,18 @@ def update_topology(devices,topology):
             top["vlan"] = vlans.pop()[0]
 
 
-
-def planner(devices,topology, group_id):
+def planner(devices, topology, group_id):
     status = update_bd(devices, group_id)
-    if status == False:
+    if not status:
         return False
-    update_topology(devices,topology)
-    if group_id != False:
-        create_playbook(topology, group_id)
-        run_playbook()
+    update_topology(devices, topology)
+    if not group_id:
+        return True
+    status = create_playbook(topology, group_id)
+    run_playbook()
+    return status
+
+
 def update_bd(devices, group_id) -> int:
     try:
         with sqlite3.connect(db_filename) as conn:
@@ -162,7 +156,7 @@ def update_bd(devices, group_id) -> int:
                 if device["device_type"] != 'PC':
                     if device["vendor"] != "Any":
                         available_devices = cursor.execute(
-                            """SELECT COUNT(*), component_id, location,port1,port2 FROM components
+                            """SELECT COUNT(*), component_id, location,port1,port2,ip FROM components
                             WHERE component_type=? AND model=? AND status=?
                             ORDER BY RANDOM() 
                             LIMIT 1
@@ -170,9 +164,10 @@ def update_bd(devices, group_id) -> int:
                         device["hosts"] = (available_devices[2])
                         device["port1"] = (available_devices[3])
                         device["port2"] = (available_devices[4])
+                        device["ip"] = available_devices[5]
                     else:
                         available_devices = cursor.execute(
-                            """SELECT COUNT(*), component_id, location,port1,port2 FROM components
+                            """SELECT COUNT(*), component_id, location,port1,port2,ip FROM components
                             WHERE component_type=? AND status=?
                             ORDER BY RANDOM() 
                             LIMIT 1
@@ -180,22 +175,24 @@ def update_bd(devices, group_id) -> int:
                         device["hosts"] = (available_devices[2])
                         device["port1"] = (available_devices[3])
                         device["port2"] = (available_devices[4])
+                        device["ip"] = available_devices[5]
                 else:
                     available_devices = cursor.execute(
-                        """SELECT COUNT(*), component_id, location, port1 FROM components
+                        """SELECT COUNT(*), component_id, location, port1,ip FROM components
                         WHERE component_type=? AND status=?
                         ORDER BY RANDOM() 
                         LIMIT 1
                         """, (device["device_type"], "Free")).fetchone()
                     device["hosts"] = "no host"
                     device["port1"] = available_devices[3]
+                    device["ip"] = available_devices[4]
                 if available_devices[0]:
                     # Если устройство доступно, обновляем статус
                     cursor.execute(
-                       """UPDATE components
-                           SET status=?, groups_id = ?
-                           WHERE component_id=?
-                        """, ('Active', group_id, available_devices[1]))
+                        """UPDATE components
+                            SET status=?, groups_id = ?
+                            WHERE component_id=?
+                         """, ('Active', group_id, available_devices[1]))
 
                 else:
                     print("Оборудование отсутствует!")
@@ -206,8 +203,10 @@ def update_bd(devices, group_id) -> int:
     except Exception as e:
         print(f"Ошибка: {e}")
 
+
 def run_playbook():
-# Запуск playbook с inventory и переменными
+    return True
+    # Запуск playbook с inventory и переменными
     result = run_ansible_playbook(
         playbook_path="vlan_playbook.yaml",
         inventory_path="inventory.ini",
@@ -220,6 +219,7 @@ def run_playbook():
         print("Ошибка выполнения playbook:")
         print(result.get("error", ""))
         print(result["stderr"])
+
 
 def free_vm(count) -> List[Tuple[int]]:
     """Возвращает указанное количество свободных VLAN."""
@@ -235,6 +235,7 @@ def free_vm(count) -> List[Tuple[int]]:
 
     return available_vlans if len(available_vlans) >= count else []
 
+
 def get_used_vlans() -> List[int]:
     """Возвращает список занятых VLAN из базы данных."""
     try:
@@ -245,6 +246,8 @@ def get_used_vlans() -> List[int]:
     except sqlite3.Error as e:
         print(f"Ошибка при получении занятых VLAN: {e}")
         return []
+
+
 def get_group_name(auditorium):
     """
     Определяет группу Ansible на основе audience_id.
@@ -255,6 +258,7 @@ def get_group_name(auditorium):
         return "KK-344"
     else:
         return "group_unknown"
+
 
 def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
     playbook = []
@@ -286,6 +290,7 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
         print(f"Ошибка при записи playbook в файл: {e}")
         return False
 
+
 def add_vlan(vlan, switchport, groups_id, audience):
     try:
         with sqlite3.connect('test.db') as conn:
@@ -301,6 +306,7 @@ def add_vlan(vlan, switchport, groups_id, audience):
         if conn:
             conn.close()
 
+
 def add_vlan_task(device_group, group_name, interface_name, vlan):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
@@ -314,24 +320,7 @@ def add_vlan_task(device_group, group_name, interface_name, vlan):
         },
     }
     device_group[group_name]['tasks'].append(task)
-def max_groups_id():
-    try:
-        conn = sqlite3.connect(db_filename)
-        cursor = conn.cursor()
-        result = cursor.execute("""
-            SELECT MAX(groups_id) 
-            FROM components 
-            WHERE groups_id IS NOT NULL
-        """)
-        group_id = result.fetchone()[0]
-        cursor.close()
-        conn.close()
-        if group_id:
-            return (group_id)
-        else:
-            return 0
-    except Exception as e:
-        print(f"Произошла ошибка: {e}")
+
 
 def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
     try:
@@ -375,6 +364,7 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
         if conn:
             conn.close()
 
+
 def del_vlan_task(device_group, group_name, interface_name, vlan):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
@@ -390,12 +380,12 @@ def del_vlan_task(device_group, group_name, interface_name, vlan):
     device_group[group_name]['tasks'].append(task)
 
 
-def clear_bd(groups_id, db_filename = 'test.db'):  # Добавим db_filename как параметр
+def clear_bd(groups_id, db_filename='test.db'):  # Добавим db_filename как параметр
     conn = None  # Инициализируем conn вне try
     try:
         conn = sqlite3.connect(db_filename)
         cursor = conn.cursor()
-        query = "UPDATE components SET status = 'Free' WHERE status = 'Active' AND `groups_id` = ?"
+        query = "UPDATE components SET groups_id = NULL, status = 'Free' WHERE status = 'Active' OR status = 'Free' AND `groups_id` = ?"
         cursor.execute(query, (groups_id,))
         conn.commit()
         print(f"Обновлено {cursor.rowcount} записей в components.")
@@ -414,12 +404,18 @@ def clear_bd(groups_id, db_filename = 'test.db'):  # Добавим db_filename 
 
 @app.route('/')
 def generate_table():
+    return render_template('table.html')
+
+
+@app.route('/api/devices')
+def get_devices():
     conn = None
     try:
         conn = sqlite3.connect(db_filename)
         cursor = conn.cursor()
         audiences = [224, 344, 411]  # Аудитории для отображения
 
+        # Собираем данные из базы
         table_data = {}
         for aud in audiences:
             cursor.execute(
@@ -428,39 +424,48 @@ def generate_table():
             devices = cursor.fetchall()
 
             for i, device in enumerate(devices):
-                component_type, model, status, group_id = device
-                device_name = f"{component_type[0]}{i + 1}-{model}"
-                if status == 'Active' and group_id is not None:
-                    device_name += f" (G{group_id})"
-                table_data.setdefault(aud, []).append((device_name, status))
+                table_data.setdefault(aud, []).append(device)
 
+        # Определяем максимальное количество строк
         max_rows = max(len(table_data.get(aud, [])) for aud in audiences)
 
-        cell_text = []
-        colors = []
-
+        # Формируем структуру ответа
+        result = {
+            "table": {
+                "headers": [f"P{aud}" for aud in audiences],
+                "rows": []
+            }
+        }
+        # Заполняем строки таблицы
         for i in range(max_rows):
-            row_text = []
-            row_colors = []
+            row = {"cells": []}
             for aud in audiences:
+                cell = {}
                 if i < len(table_data.get(aud, [])):
-                    device_name, status = table_data[aud][i]
-                    row_text.append(device_name)
+                    # Данные из SELECT'а
+                    component_type, model, status, group_id = table_data[aud][i]
+                    device_name = f"{component_type[0]}{i + 1}-{model}"
+                    if status == 'Active' and group_id is not None:
+                        device_name += f" (G{group_id})"
+                    cell["component_type"] = component_type
+                    cell["model"] = model
+                    cell["text"] = device_name
+                    cell["status"] = status
+                    cell["group_id"] = group_id
+                    # Определяем цвет в зависимости от статуса
                     if status == 'Active':
-                        row_colors.append(mcolors.to_hex('yellow'))
+                        cell["backgroundColor"] = mcolors.to_hex('yellow')
                     elif status == 'Free':
-                        row_colors.append(mcolors.to_hex('lightgreen'))
+                        cell["backgroundColor"] = mcolors.to_hex('lightgreen')
                     else:
-                        row_colors.append(mcolors.to_hex('lightcoral'))
+                        cell["backgroundColor"] = mcolors.to_hex('lightcoral')
                 else:
-                    row_text.append('')
-                    row_colors.append('white')
-            cell_text.append(row_text)
-            colors.append(row_colors)
+                    cell["text"] = ""
+                    cell["backgroundColor"] = "#FFFFFF"  # white
+                row["cells"].append(cell)
+            result["table"]["rows"].append(row)
 
-        col_labels = [f"P{aud}" for aud in audiences]
-
-        return render_template('table.html', col_labels=col_labels, cell_text=cell_text, colors=colors)
+        return jsonify(result)
 
     finally:
         if conn:
@@ -511,17 +516,15 @@ def api_run_lab():
                 'status': 'error',
                 'message': 'lab_number is required'
             }), 400
-        if not vendor:
-            run_lab(lab_number,group_id)
-        if vendor:
-            run_lab(lab_number,group_id,vendor)
-        # Add more labs here as needed
-        else:
+        if not run_lab(lab_number, group_id, vendor or "Any"):
             return jsonify({
                 'status': 'error',
-                'message': f'Lab {lab_number} not implemented'
+                'message': f'Lab {lab_number} not created'
             }), 400
-
+        return jsonify({
+            'status': 'success',
+            'message': f'Lab {lab_number} created successfully'
+        }), 200
     except Exception as e:
         return jsonify({
             'status': 'error',
@@ -533,20 +536,10 @@ if __name__ == '__main__':
     #app.run(host='0.0.0.0', port=5005)
     run_lab(1,'1')
 
+# curl -X POST -H "Content-Type: application/json" -d '{"lab_number":1, "vendor":"Cisco"}' http://localhost:5000/api/run_lab
 
+# curl -X POST -H "Content-Type: application/json" -d '{"group_id":1}' http://localhost:5000/api/clear_db
 
-
-
-
-#curl -X POST -H "Content-Type: application/json" -d '{"lab_number":1, "vendor":"Cisco"}' http://localhost:5000/api/run_lab
-
-#curl -X POST -H "Content-Type: application/json" -d '{"group_id":1}' http://localhost:5000/api/clear_db
-
-#curl http://localhost:5000/api/generate_table
-#curl -X POST http://10.40.225.6:5005/api/run_lab -H "Content-Type: application/json" -d "{""lab_number"": 1}"
-#curl -X POST http://10.40.225.6:5005/api/clear_db -H "Content-Type: application/json" -d "{""group_id"": 1}"
-
-
-
-
-
+# curl http://localhost:5000/api/generate_table
+# curl -X POST http://10.40.225.6:5005/api/run_lab -H "Content-Type: application/json" -d "{""lab_number"": 1}"
+# curl -X POST http://10.40.225.6:5005/api/clear_db -H "Content-Type: application/json" -d "{""group_id"": 1}"

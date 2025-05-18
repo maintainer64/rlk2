@@ -1,5 +1,6 @@
-import sqlite3
 import os
+import sqlite3
+
 
 def create_and_populate_database(db_filename="test.db"):
     conn = None  # Инициализация conn вне блока try
@@ -22,7 +23,8 @@ def create_and_populate_database(db_filename="test.db"):
                 status TEXT,
                 port1 TEXT,
                 port2 TEXT,
-                groups_id INTEGER DEFAULT NULL
+                groups_id INTEGER DEFAULT NULL,
+                ip TEXT
             )
         """)
         print("Таблица 'components' успешно создана.")
@@ -38,16 +40,16 @@ def create_and_populate_database(db_filename="test.db"):
 
         # 2. Заполнение таблицы данными
         data = [
-            (1, 'Switch', 344, 'Huawei', 'Free', 'Fa1/0/36', 'Fa1/0/37', None),
-            (2, 'Switch', 224, 'Cisco', 'Free', 'Fa0/20', 'Fa0/21', None),
-            (3, 'PC', 71, None, 'Free', 71, None, None),
-            (4, 'PC', 72, None, 'Free', 72, None, None),
+            (1, 'Switch', 344, 'Huawei', 'Free', 'Fa1/0/36', 'Fa1/0/37', None, "10.20.121.21"),
+            (2, 'Switch', 224, 'Cisco', 'Free', 'Fa0/20', 'Fa0/21', None, "10.20.121.21"),
+            (3, 'PC', 71, None, 'Free', 71, None, None, "10.20.121.21"),
+            (4, 'PC', 72, None, 'Free', 72, None, None, "10.20.121.21"),
 
         ]
 
         cursor.executemany("""
-            INSERT INTO components (component_id, component_type, location, model, status, port1, port2, groups_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) 
+            INSERT INTO components (component_id, component_type, location, model, status, port1, port2, groups_id, ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
         """, data)
         print("Данные успешно вставлены в таблицу 'components'.")
 
@@ -61,6 +63,7 @@ def create_and_populate_database(db_filename="test.db"):
     finally:
         if conn:
             conn.close()
+
 
 # Пример использования:
 if __name__ == "__main__":
