@@ -41,10 +41,13 @@ def create_and_populate_database(db_filename="test.db"):
 
         # 2. Заполнение таблицы данными
         data = [
-            (1, 'Switch', 344, 'Huawei', 'Free', 'Fa1/0/36', 'Fa1/0/37', None, "10.20.121.21"),
-            (2, 'Switch', 224, 'Cisco', 'Free', 'Fa0/20', 'Fa0/21', None, "10.20.121.21"),
-            (3, 'PC', 71, None, 'Free', 71, None, None, "10.20.121.21"),
-            (4, 'PC', 72, None, 'Free', 72, None, None, "10.20.121.21"),
+            (1, 'Switch', 344, 'Cisco', 'Free', 'Fa1/0/36', 'Fa1/0/37', None, "10.20.121.21"),
+            (4, 'Switch', 224, 'Cisco', 'Free', 'Fa0/20', 'Fa0/21', None, "10.20.121.21"),
+            (5, 'Router', 344, 'Cisco', 'Free', 'Fa1/0/32', 'Fa1/0/33', None, "10.20.121.21"),
+            (6, 'Router', 224, 'Cisco', 'Free', 'Fa0/11', 'Fa0/12', None, "10.20.121.21"),
+
+            (7, 'PC', 71, None, 'Free', 71, None, None, "10.20.121.21"),
+            (8, 'PC', 72, None, 'Free', 72, None, None, "10.20.121.21"),
 
         ]
 
