@@ -282,7 +282,7 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
             if 'connection' in top:
                 if top["connection"] == "trunk":
                     add_trunk_vlan_task(device_group, auditorium, top["target"], top["vlan"])
-                    add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
+                    add_vlan(top["vlan"], top["target"], group_id, auditorium, "trunk")
             else:
                 add_vlan_task(device_group, auditorium, top["target"], top["vlan"])
                 add_vlan(top["vlan"], top["target"], group_id, auditorium)
