@@ -335,7 +335,7 @@ def add_trunk_vlan_task(device_group, group_name, interface_name, vlan,encapsula
         'ios_config': {
             'parents': f"interface {interface_name}",
             'lines': [
-                "switchport access vlan {vlan}",
+                f"switchport access vlan {vlan}",
                 f"switchport trunk encapsulation {encapsulation}",
                 "switchport mode dot1q-tunnel",
                 "no cdp enable"    
@@ -398,7 +398,7 @@ def del_trunk_task(device_group, group_name, interface_name, vlan):
         'ios_config': {
             'parents': f"interface {interface_name}",
             'lines': [
-                "no switchport access vlan {vlan}",
+                f"no switchport access vlan {vlan}",
                 f"no switchport trunk encapsulation {encapsulation}",
                 "no switchport mode dot1q-tunnel",
                 "cdp enable"    
