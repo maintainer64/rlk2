@@ -269,10 +269,12 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
             if auditorium not in device_group:
                 device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
             if 'connection' in top:
-                add_trunk_vlan_task(device_group, auditorium, top["source"])
+                if top["connection"] == "trunk":
+                    add_trunk_vlan_task(device_group, auditorium, top["source"])
+                    add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
             else:
                 add_vlan_task(device_group, auditorium, top["source"], top["vlan"])
-                add_vlan(top["vlan"], top["source"], group_id, auditorium)
+                add_vlan(top["vlan"], top["source"], group_id, auditorium, "default)
         if "PC" not in top["target"]:
             auditorium = get_group_name(top["host in target"])
             if auditorium not in device_group:
@@ -294,13 +296,13 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
         return False
 
 
-def add_vlan(vlan, switchport, groups_id, audience):
+def add_vlan(vlan, switchport, groups_id, audience, connection="default"):
     try:
         with sqlite3.connect('test.db') as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO vlan_config (vlan, switchport, groups_id, audience)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO vlan_config (vlan, switchport, groups_id, audience,connection)
+                VALUES (?, ?, ?, ?, ?)
             """, (vlan, switchport, groups_id, audience))
             conn.commit()
     except sqlite3.Error as e:
@@ -324,15 +326,16 @@ def add_vlan_task(device_group, group_name, interface_name, vlan):
     }
     device_group[group_name]['tasks'].append(task)
 
-def add_trunk_vlan_task(device_group, group_name, interface_name, allowed_vlans='1',encapsulation="dot1q"):
+def add_trunk_vlan_task(device_group, group_name, interface_name, vlan,encapsulation="dot1q"):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
             'parents': f"interface {interface_name}",
             'lines': [
-                "switchport mode trunk",
+                "switchport access vlan {vlan}",
                 f"switchport trunk encapsulation {encapsulation}",
-                "no cdp enable",
+                "switchport mode dot1q-tunnel",
+                "no cdp enable"    
             ],
         },
     }
@@ -363,9 +366,13 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
             for device in available_devices:
                 print(device)
                 auditorium = device[3]
+                connection = device[4]
                 if auditorium not in device_group:
                     device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
-                del_vlan_task(device_group, auditorium, device[1], device[0])
+                if connection == "trunk"
+                    del_trunk_task(device_group, auditorium, device[1], device[0])
+                else:
+                    del_vlan_task(device_group, auditorium, device[1], device[0])
             playbook.extend(list(device_group.values()))
             try:
                 playbook_yaml = yaml.dump(playbook, indent=2, allow_unicode=True)
@@ -383,6 +390,22 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
 
 
 def del_vlan_task(device_group, group_name, interface_name, vlan):
+    task = {
+        'name': f"Настройка порта {interface_name} в VLAN {vlan}",
+        'ios_config': {
+            'parents': f"interface {interface_name}",
+            'lines': [
+                "no switchport access vlan {vlan}",
+                f"no switchport trunk encapsulation {encapsulation}",
+                "no switchport mode dot1q-tunnel",
+                "cdp enable"    
+            ],
+        },
+    }
+    device_group[group_name]['tasks'].append(task)
+
+
+def del_trunk_task(device_group, group_name, interface_name, vlan):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
