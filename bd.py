@@ -33,7 +33,8 @@ def create_and_populate_database(db_filename="test.db"):
                    vlan INTEGER,
                    switchport TEXT,
                    groups_id INTEGER DEFAULT NULL,
-                   audience INTEGER DEFAULT NULL
+                   audience INTEGER DEFAULT NULL,
+                   connection TEXT                   
                )
            """)
         print("Таблица 'vlan_config' успешно создана.")
