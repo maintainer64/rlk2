@@ -268,8 +268,11 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
             auditorium = get_group_name(top["host in source"])
             if auditorium not in device_group:
                 device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
-            add_vlan_task(device_group, auditorium, top["source"], top["vlan"])
-            add_vlan(top["vlan"], top["source"], group_id, auditorium)
+            if 'connection' in top:
+                add_trunk_vlan_task(device_group, auditorium, top["source"])
+            else:
+                add_vlan_task(device_group, auditorium, top["source"], top["vlan"])
+                add_vlan(top["vlan"], top["source"], group_id, auditorium)
         if "PC" not in top["target"]:
             auditorium = get_group_name(top["host in target"])
             if auditorium not in device_group:
