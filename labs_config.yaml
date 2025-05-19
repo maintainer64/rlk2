@@ -38,3 +38,29 @@ labs:
         target: "Router2(port1)"
       - source: "Router2(port2)"
         target: "PC2(vlan)"
+        
+  lab2_1:
+    devices:
+      - name: "PC1"
+        device_type: "PC"
+        hosts: "-"
+      - name: "PC2"
+        device_type: "PC"
+        hosts: "-"
+      - name: "Switch1"
+        device_type: "Switch"
+      - name: "Switch2"
+        device_type: "Switch"
+    topology:
+      - source: "PC1(vlan)"
+        target: "Switch1(port1)"
+      - source: "Switch1(port2)"
+        target: "Router1(port1)"
+        connection: trunk
+      - source: "Router1(port2)"
+        target: "Router2(port1)"
+      - source: "Router2(port2)"
+        target: "Switch2(port1)"
+      - source: "Switch2(port2)"
+        target: "PC2(vlan)"        
+        
