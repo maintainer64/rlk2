@@ -142,7 +142,7 @@ def planner(devices, topology, group_id):
     if not group_id:
         return True
     status = create_playbook(topology, group_id)
-    run_playbook()
+    #run_playbook()
     return status
 
 
@@ -274,7 +274,7 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
                     add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
             else:
                 add_vlan_task(device_group, auditorium, top["source"], top["vlan"])
-                add_vlan(top["vlan"], top["source"], group_id, auditorium, "default)
+                add_vlan(top["vlan"], top["source"], group_id, auditorium, "default")
         if "PC" not in top["target"]:
             auditorium = get_group_name(top["host in target"])
             if auditorium not in device_group:
@@ -369,7 +369,7 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
                 connection = device[4]
                 if auditorium not in device_group:
                     device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
-                if connection == "trunk"
+                if connection == "trunk":
                     del_trunk_task(device_group, auditorium, device[1], device[0])
                 else:
                     del_vlan_task(device_group, auditorium, device[1], device[0])
