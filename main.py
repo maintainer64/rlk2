@@ -270,7 +270,7 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
                 device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
             if 'connection' in top:
                 if top["connection"] == "trunk":
-                    add_trunk_vlan_task(device_group, auditorium, top["source"])
+                    add_trunk_vlan_task(device_group, auditorium, top["source"], top["vlan"])
                     add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
             else:
                 add_vlan_task(device_group, auditorium, top["source"], top["vlan"])
@@ -281,10 +281,11 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
                 device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
             if 'connection' in top:
                 if top["connection"] == "trunk":
-                    add_trunk_vlan_task(device_group, auditorium, top["target"], top["vlan])
+                    add_trunk_vlan_task(device_group, auditorium, top["target"], top["vlan"])
                     add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
-            add_vlan_task(device_group, auditorium, top["target"], top["vlan"])
-            add_vlan(top["vlan"], top["target"], group_id, auditorium)
+            else:
+                add_vlan_task(device_group, auditorium, top["target"], top["vlan"])
+                add_vlan(top["vlan"], top["target"], group_id, auditorium)
     print(device_group)
     # Преобразуем словарь групп в список плейбучных заданий
     playbook.extend(list(device_group.values()))
@@ -392,7 +393,7 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
             conn.close()
 
 
-def del_trunk_task(device_group, group_name, interface_name, vlan):
+def del_trunk_task(device_group, group_name, interface_name, vlan, encapsulation="dot1q"):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
