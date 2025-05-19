@@ -389,7 +389,7 @@ def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
             conn.close()
 
 
-def del_vlan_task(device_group, group_name, interface_name, vlan):
+def del_trunk_task(device_group, group_name, interface_name, vlan):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
@@ -405,7 +405,7 @@ def del_vlan_task(device_group, group_name, interface_name, vlan):
     device_group[group_name]['tasks'].append(task)
 
 
-def del_trunk_task(device_group, group_name, interface_name, vlan):
+def del_vlan_task(device_group, group_name, interface_name, vlan):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
