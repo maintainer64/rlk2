@@ -279,12 +279,15 @@ def create_playbook(topology, group_id, output_file="vlan_playbook.yaml"):
             auditorium = get_group_name(top["host in target"])
             if auditorium not in device_group:
                 device_group[auditorium] = {'hosts': auditorium, 'gather_facts': 'no', 'tasks': []}
+            if 'connection' in top:
+                if top["connection"] == "trunk":
+                    add_trunk_vlan_task(device_group, auditorium, top["target"], top["vlan])
+                    add_vlan(top["vlan"], top["source"], group_id, auditorium, "trunk")
             add_vlan_task(device_group, auditorium, top["target"], top["vlan"])
             add_vlan(top["vlan"], top["target"], group_id, auditorium)
     print(device_group)
     # Преобразуем словарь групп в список плейбучных заданий
     playbook.extend(list(device_group.values()))
-
     try:
         # Конвертирование плейбука в YAML и запись в файл
         playbook_yaml = yaml.dump(playbook, indent=2, allow_unicode=True)
