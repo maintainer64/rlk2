@@ -51,6 +51,10 @@ labs:
         device_type: "Switch"
       - name: "Switch2"
         device_type: "Switch"
+      - name: "Router1"
+        device_type: "Router"
+      - name: "Router2"
+        device_type: "Router"
     topology:
       - source: "PC1(vlan)"
         target: "Switch1(port1)"
