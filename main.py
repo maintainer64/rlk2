@@ -321,6 +321,20 @@ def add_vlan_task(device_group, group_name, interface_name, vlan):
     }
     device_group[group_name]['tasks'].append(task)
 
+def add_trunk_vlan_task(device_group, group_name, interface_name, allowed_vlans='1',encapsulation="dot1q"):
+    task = {
+        'name': f"Настройка порта {interface_name} в VLAN {vlan}",
+        'ios_config': {
+            'parents': f"interface {interface_name}",
+            'lines': [
+                "switchport mode trunk",
+                f"switchport trunk encapsulation {encapsulation}",
+                "no cdp enable",
+            ],
+        },
+    }
+    device_group[group_name]['tasks'].append(task)
+
 
 def clear_vlan(groups_id, output_file="vlan_playbook.yaml"):
     try:
