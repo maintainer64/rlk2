@@ -6,7 +6,8 @@ from typing import List, Dict, Tuple, Union
 import matplotlib.colors as mcolors
 import yaml
 from flask import Flask, jsonify, request, render_template
-
+from pnetLabParser import generate_unl_from_template
+from prepare_unl import prepare_telnet_links, prepare_interface_mapping
 db_filename = 'test.db'
 
 app = Flask(__name__)
@@ -107,7 +108,21 @@ def run_lab(lab_number, group_id, vendor="Any") -> bool:
             vendor_index += 1
         else:
             continue
-    return planner(devices, topology, group_id)
+    status = planner(devices, topology, group_id)
+    print(topology)
+    if status == False:
+        return False
+    telnet_links = prepare_telnet_links(devices)
+    print(telnet_links)
+    interface_mapping = prepare_interface_mapping(topology)
+    print(interface_mapping)
+    unl_path = generate_unl_from_template(
+        template_path="templates/Lab_2_2.html",
+        lab_name="MyLab",
+        telnet_links=telnet_links,
+        interface_mapping=interface_mapping,
+        debug=True
+    )
 
 
 def update_topology(devices, topology):
@@ -117,18 +132,24 @@ def update_topology(devices, topology):
             if device['name'] in top["source"]:
                 if device["device_type"] == 'PC':
                     top["vlan"] = device["port1"]
+                    top['name in source'] = device['name']
                 if "(port2)" in top["source"]:
                     top["source"] = device["port2"]
+                    top['name in source'] = device['name']
                 elif "(port1)" in top["source"]:
                     top["source"] = device["port1"]
+                    top['name in source'] = device['name']
                 top["host in source"] = device["hosts"]
             if device['name'] in top["target"]:
                 if device["device_type"] == 'PC':
                     top["vlan"] = device["port1"]
+                    top['name in target'] = device['name']
                 if "(port2)" in top["target"]:
                     top["target"] = device["port2"]
+                    top['name in target'] = device['name']
                 elif "(port1)" in top["target"]:
                     top["target"] = device["port1"]
+                    top['name in target'] = device['name']
                 top["host in target"] = device["hosts"]
         if 'vlan' not in top:
             top["vlan"] = vlans.pop()[0]
@@ -307,7 +328,7 @@ def add_vlan(vlan, switchport, groups_id, audience, connection="default"):
             cursor.execute("""
                 INSERT INTO vlan_config (vlan, switchport, groups_id, audience,connection)
                 VALUES (?, ?, ?, ?, ?)
-            """, (vlan, switchport, groups_id, audience))
+            """, (vlan, switchport, groups_id, audience, connection))
             conn.commit()
     except sqlite3.Error as e:
         print(f"Ошибка при добавлении VLAN: {e}")
@@ -336,9 +357,10 @@ def add_trunk_vlan_task(device_group, group_name, interface_name, vlan,encapsula
         'ios_config': {
             'parents': f"interface {interface_name}",
             'lines': [
+                f"switchport access vlan {vlan}",
                 f"switchport trunk encapsulation {encapsulation}",
-                "switchport mode trunk",
-                "no cdp enable"    
+                "switchport mode dot1q-tunnel",
+                "no cdp enable"
             ],
         },
     }
@@ -401,7 +423,7 @@ def del_trunk_task(device_group, group_name, interface_name, vlan, encapsulation
                 f"no switchport access vlan {vlan}",
                 f"no switchport trunk encapsulation {encapsulation}",
                 "no switchport mode dot1q-tunnel",
-                "cdp enable"    
+                "cdp enable"
             ],
         },
     }
