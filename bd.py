@@ -1,6 +1,8 @@
 import os
 import sqlite3
 
+from unl_store import unl_table_create
+
 
 def create_and_populate_database(db_filename="test.db"):
     conn = None  # Инициализация conn вне блока try
@@ -56,6 +58,9 @@ def create_and_populate_database(db_filename="test.db"):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
         """, data)
         print("Данные успешно вставлены в таблицу 'components'.")
+
+        unl_table_create(db=conn)
+        print("Создание таблицы 'files'")
 
         # 4. Сохранение изменений и закрытие соединения
         conn.commit()

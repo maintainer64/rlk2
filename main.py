@@ -1,3 +1,4 @@
+import io
 import os
 import sqlite3
 import subprocess
@@ -5,9 +6,13 @@ from typing import List, Dict, Tuple, Union
 
 import matplotlib.colors as mcolors
 import yaml
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_file
+from flask_swagger_ui import get_swaggerui_blueprint
+
 from pnetLabParser import generate_unl_from_template
 from prepare_unl import prepare_telnet_links, prepare_interface_mapping
+from unl_store import unl_file_content_get, unl_file_save_or_update, unl_file_delete
+
 db_filename = 'test.db'
 
 app = Flask(__name__)
@@ -91,7 +96,7 @@ def load_lab_config(lab_number):
         return config['labs'][lab_key]
 
 
-def run_lab(lab_number, group_id, vendor="Any") -> bool:
+def run_lab(lab_number, group_id, vendor="Any") -> bytes | None:
     """Запускает указанную лабораторную работу"""
     lab_config = load_lab_config(lab_number)
     devices = lab_config['devices']
@@ -110,19 +115,22 @@ def run_lab(lab_number, group_id, vendor="Any") -> bool:
             continue
     status = planner(devices, topology, group_id)
     print(topology)
-    if status == False:
-        return False
+    if not status:
+        return None
     telnet_links = prepare_telnet_links(devices)
     print(telnet_links)
     interface_mapping = prepare_interface_mapping(topology)
     print(interface_mapping)
-    unl_path = generate_unl_from_template(
+    content = generate_unl_from_template(
         template_path="templates/Lab_2_2.html",
         lab_name="MyLab",
         telnet_links=telnet_links,
         interface_mapping=interface_mapping,
         debug=True
     )
+    with sqlite3.connect(db_filename) as conn:
+        unl_file_save_or_update(conn, group_id, content)
+    return content
 
 
 def update_topology(devices, topology):
@@ -163,11 +171,11 @@ def planner(devices, topology, group_id):
     if not group_id:
         return True
     status = create_playbook(topology, group_id)
-    #run_playbook()
+    run_playbook()
     return status
 
 
-def update_bd(devices, group_id) -> int:
+def update_bd(devices, group_id) -> bool:
     try:
         with sqlite3.connect(db_filename) as conn:
             cursor = conn.cursor()
@@ -223,10 +231,10 @@ def update_bd(devices, group_id) -> int:
         return True
     except Exception as e:
         print(f"Ошибка: {e}")
+    return False
 
 
 def run_playbook():
-    return True
     # Запуск playbook с inventory и переменными
     result = run_ansible_playbook(
         playbook_path="vlan_playbook.yaml",
@@ -351,7 +359,8 @@ def add_vlan_task(device_group, group_name, interface_name, vlan):
     }
     device_group[group_name]['tasks'].append(task)
 
-def add_trunk_vlan_task(device_group, group_name, interface_name, vlan,encapsulation="dot1q"):
+
+def add_trunk_vlan_task(device_group, group_name, interface_name, vlan, encapsulation="dot1q"):
     task = {
         'name': f"Настройка порта {interface_name} в VLAN {vlan}",
         'ios_config': {
@@ -449,6 +458,7 @@ def clear_bd(groups_id, db_filename='test.db'):  # Добавим db_filename к
     conn = None  # Инициализируем conn вне try
     try:
         conn = sqlite3.connect(db_filename)
+        unl_file_delete(db=conn, groups_id=groups_id)
         cursor = conn.cursor()
         query = "UPDATE components SET groups_id = NULL, status = 'Free' WHERE status = 'Active' OR status = 'Free' AND `groups_id` = ?"
         cursor.execute(query, (groups_id,))
@@ -571,6 +581,16 @@ def api_run_lab():
         vendor = data.get('vendor')
         group_id = data.get('group_id')
 
+        with sqlite3.connect(db_filename) as conn:
+            content_file_unl = unl_file_content_get(conn, group_id)
+        if content_file_unl:
+            return send_file(
+                io.BytesIO(content_file_unl),
+                mimetype='application/xml',
+                as_attachment=True,
+                download_name='%s.unl' % group_id
+            ), 200
+
         if not group_id:
             return jsonify({
                 'status': 'error',
@@ -581,15 +601,18 @@ def api_run_lab():
                 'status': 'error',
                 'message': 'lab_number is required'
             }), 400
-        if not run_lab(lab_number, group_id, vendor or "Any"):
+        unl_file = run_lab(lab_number, group_id, vendor or "Any")
+        if not unl_file:
             return jsonify({
                 'status': 'error',
                 'message': f'Lab {lab_number} not created'
             }), 400
-        return jsonify({
-            'status': 'success',
-            'message': f'Lab {lab_number} created successfully'
-        }), 200
+        return send_file(
+            io.BytesIO(unl_file),
+            mimetype='application/xml',
+            as_attachment=True,
+            download_name='%s.unl' % group_id
+        ), 200
     except Exception as e:
         return jsonify({
             'status': 'error',
@@ -597,9 +620,22 @@ def api_run_lab():
         }), 500
 
 
+@app.route('/api/openapi.json', methods=['GET'])
+def api_openapi():
+    return send_file('templates/openapi.json', mimetype='application/json')
+
+
+# Call factory function to create our blueprint
+swaggerui_blueprint = get_swaggerui_blueprint(
+    "/api/docs",
+    "/api/openapi.json",
+)
+
+app.register_blueprint(swaggerui_blueprint)
+
 if __name__ == '__main__':
-    #app.run(host='0.0.0.0', port=5005)
-    run_lab(1,'1')
+    app.run(host='0.0.0.0', port=5005, debug=False)
+    # run_lab(1, '1')
 
 # curl -X POST -H "Content-Type: application/json" -d '{"lab_number":1, "vendor":"Cisco"}' http://localhost:5000/api/run_lab
 

@@ -1,0 +1,56 @@
+@startuml Компонентная диаграмма системы
+skinparam shadowing false
+skinparam monochrome true
+skinparam linetype ortho
+skinparam defaultFontName "Times New Roman"
+
+component "Moodle LMS" as moodle {
+  [LTI Consumer]
+}
+
+component "AUTH-RLC" as auth_rlc {
+  [LTI Provider]
+  [Webhooks API]
+}
+
+component "RLK2" as rlk2 {
+  [Core Service]
+  [pnetLabParser]
+  [UNL Generator]
+}
+
+database "RLK2 Database" as rlk2_db {
+  [Devices]
+  [Topologies]
+}
+
+component "physical-arp" as physical_arp {
+  [ARP Scanner]
+}
+
+component "PNETLab" as pnetlab {
+  [Lab Controller]
+}
+
+cloud "Физическое оборудование" as devices
+
+' Связи
+moodle ---> auth_rlc: [LTI Auth]
+auth_rlc ---> rlk2: [Webhooks]
+rlk2 ---> rlk2_db
+physical_arp -> rlk2_db: [SQL]
+pnetlab ---> auth_rlc: [Proxy API]
+devices --> physical_arp
+
+note bottom of auth_rlc
+  Центральный сервис аутентификации
+  и маршрутизации запросов
+end note
+
+note bottom of rlk2
+  Основной движок лабораторных работ:
+  - Управление конфигурациями
+  - Генерация топологий
+  - Взаимодействие с PNETLab
+end note
+@enduml

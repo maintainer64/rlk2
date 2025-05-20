@@ -1,129 +1,18 @@
 # 🚀 Network Lab Automation System
 
+[Swagger UI](http://localhost:5000/api/docs)
+
 Система автоматизации управления сетевыми лабораторными стендами с REST API и веб-интерфейсом
 
 ## 🌐 Архитектура системы
 
 ### Компонентная диаграмма
 
-```plantuml
-@startuml Компонентная диаграмма системы
-skinparam shadowing false
-skinparam monochrome true
-skinparam linetype ortho
-skinparam defaultFontName "Times New Roman"
-
-component "Moodle LMS" as moodle {
-  [LTI Consumer]
-}
-
-component "AUTH-RLC" as auth_rlc {
-  [LTI Provider]
-  [Webhooks API]
-}
-
-component "RLK2" as rlk2 {
-  [Core Service]
-  [pnetLabParser]
-  [UNL Generator]
-}
-
-database "RLK2 Database" as rlk2_db {
-  [Devices]
-  [Topologies]
-}
-
-component "physical-arp" as physical_arp {
-  [ARP Scanner]
-}
-
-component "PNETLab" as pnetlab {
-  [Lab Controller]
-}
-
-cloud "Физическое оборудование" as devices
-
-' Связи
-moodle ---> auth_rlc: [LTI Auth]
-auth_rlc ---> rlk2: [Webhooks]
-rlk2 ---> rlk2_db
-physical_arp -> rlk2_db: [SQL]
-pnetlab ---> auth_rlc: [Proxy API]
-devices --> physical_arp
-
-note bottom of auth_rlc
-  Центральный сервис аутентификации
-  и маршрутизации запросов
-end note
-
-note bottom of rlk2
-  Основной движок лабораторных работ:
-  - Управление конфигурациями
-  - Генерация топологий
-  - Взаимодействие с PNETLab
-end note
-@enduml
-```
+![images/1.png](images/1.png)
 
 ### Последовательность работы
 
-```plantuml
-@startuml Последовательность работы системы
-
-skinparam shadowing false
-skinparam monochrome true
-skinparam linetype ortho
-skinparam defaultFontName "Times New Roman"
-
-actor Пользователь as user
-participant Moodle
-participant "AUTH-RLC" as auth
-participant "PNETLab" as pnet
-participant "RLK2" as rlk2
-participant "physical-arp" as arp
-database "RLK2 Database" as db
-participant "Оборудование" as devices
-
-autonumber "<b>[000]"
-
-== Этап 1: Обнаружение оборудования ==
-arp -> devices: Сканирование сети (ARP)
-devices --> arp: IP, MAC, Vendor
-arp -> db: Сохранение данных\n(обновление БД)
-
-note right of arp
-  <b>Периодическое сканирование</b>
-  (каждые 5 минут)
-  Обновляет актуальное состояние
-  оборудования в БД
-end note
-
-== Этап 2: Аутентификация ==
-user -> Moodle: Запуск лабораторной работы
-Moodle -> auth: LTI Launch запрос
-auth -> pnet: OpenID аутентификация
-pnet --> auth: Подтверждение auth
-auth --> Moodle: Перенаправление в PNETLab
-user -> pnet: Работа в интерфейсе
-
-== Этап 3: Получение топологии ==
-pnet -> auth: Запрос файла топологии
-auth -> rlk2: Запрос доступного оборудования
-rlk2 -> db: Получение списка устройств
-db --> rlk2: Список свободных устройств
-rlk2 -> db: Бронирование оборудования
-rlk2 -> rlk2: PnetLabParser\n(генерация UNL)
-rlk2 --> auth: UNL файл топологии
-auth --> pnet: Передача UNL файла
-
-note left of rlk2
-  <b>PnetLabParser</b> преобразует:
-  1. Список устройств из БД
-  2. Параметры лабораторной работы
-  → в UNL-топологию
-end note
-@enduml
-```
+![images/2.png](images/2.png)
 
 ## 🔍 О проекте
 
