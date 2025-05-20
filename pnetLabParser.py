@@ -2,11 +2,12 @@ import base64
 import hashlib
 import re
 import uuid
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
+
 from bs4 import BeautifulSoup
-import xml.etree.ElementTree as ET
 
 
 @dataclass
@@ -189,7 +190,7 @@ def generate_unl_from_template(
         interface_mapping: List[Dict[str, str]],
         output_dir: str = None,
         debug: bool = False
-) -> str:
+) -> bytes:
     """
     Генерация UNL файла из HTML шаблона
 
@@ -225,16 +226,16 @@ def generate_unl_from_template(
     base64_content = base64.b64encode(clean_html_content(processed_html).encode("utf-8")).decode()
 
     # Сохранение UNL
-    output_path = output_dir / f"{lab_name}.unl"
-    output_path.write_bytes(create_lab_xml(lab_name, base64_content))
+    content = create_lab_xml(lab_name, base64_content)
 
     if debug:
         debug_html = output_dir / f"{lab_name}_debug.html"
         debug_html.write_text(processed_html, encoding='utf-8')
         print(f"Debug HTML saved to: {debug_html}")
+        output_path = output_dir / f"{lab_name}.unl"
+        output_path.write_bytes(content)
 
-    return str(output_path.resolve())
-
+    return content
 
 def debug_html_output(html_content: str, output_path: Path) -> None:
     """Сохранение отладочного HTML"""

@@ -32,12 +32,3 @@
       - no cdp enable
       parents: interface Fa0/21
     name: Настройка порта Fa0/21 в VLAN 72
-[KK-344]
-switch1 ansible_host=10.40.80.76 ansible_user=admin ansible_password=cisco
-[KK-224]
-switch2 ansible_host=10.40.76.102 ansible_user=admin ansible_password=cisco
-[all:vars]
-ansible_user=admin
-ansible_password=Cisco
-ansible_connection=network_cli
-ansible_network_os=ios
