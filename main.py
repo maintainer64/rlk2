@@ -122,7 +122,7 @@ def run_lab(lab_number, group_id, vendor="Any") -> bytes | None:
     interface_mapping = prepare_interface_mapping(topology)
     print(interface_mapping)
     content = generate_unl_from_template(
-        template_path="templates/Lab_2_2.html",
+        template_path=f"templates/{lab_number}.html",
         lab_name="MyLab",
         telnet_links=telnet_links,
         interface_mapping=interface_mapping,
@@ -144,9 +144,11 @@ def update_topology(devices, topology):
                 if "(port2)" in top["source"]:
                     top["source"] = device["port2"]
                     top['name in source'] = device['name']
+                    top["source user"] = device["port2_user"]
                 elif "(port1)" in top["source"]:
                     top["source"] = device["port1"]
                     top['name in source'] = device['name']
+                    top["source user"] = device["port1_user"]
                 top["host in source"] = device["hosts"]
             if device['name'] in top["target"]:
                 if device["device_type"] == 'PC':
@@ -155,8 +157,10 @@ def update_topology(devices, topology):
                 if "(port2)" in top["target"]:
                     top["target"] = device["port2"]
                     top['name in target'] = device['name']
+                    top["target user"] = device["port2_user"]
                 elif "(port1)" in top["target"]:
                     top["target"] = device["port1"]
+                    top["target user"] = device["port1_user"]
                     top['name in target'] = device['name']
                 top["host in target"] = device["hosts"]
         if 'vlan' not in top:
@@ -185,18 +189,20 @@ def update_bd(devices, group_id) -> bool:
                 if device["device_type"] != 'PC':
                     if device["vendor"] != "Any":
                         available_devices = cursor.execute(
-                            """SELECT COUNT(*), component_id, location,port1,port2,ip FROM components
-                            WHERE component_type=? AND model=? AND status=?
+                             """SELECT COUNT(*), component_id, location,port1,port2,ip,port1_user,port2_user FROM components
+                            WHERE component_type=? AND model=? and status=?
                             ORDER BY RANDOM() 
                             LIMIT 1
-                            """, (device["device_type"], device["vendor"], "Free")).fetchone()
-                        device["hosts"] = (available_devices[2])
+                            """, (device["device_type"], "Free")).fetchone()
+                         device["hosts"] = (available_devices[2])
                         device["port1"] = (available_devices[3])
                         device["port2"] = (available_devices[4])
+                        device["port1_user"] = available_devices[6]
+                        device["port2_user"] = available_devices[7]
                         device["ip"] = available_devices[5]
                     else:
                         available_devices = cursor.execute(
-                            """SELECT COUNT(*), component_id, location,port1,port2,ip FROM components
+                            """SELECT COUNT(*), component_id, location,port1,port2,ip,port1_user,port2_user FROM components
                             WHERE component_type=? AND status=?
                             ORDER BY RANDOM() 
                             LIMIT 1
@@ -204,6 +210,8 @@ def update_bd(devices, group_id) -> bool:
                         device["hosts"] = (available_devices[2])
                         device["port1"] = (available_devices[3])
                         device["port2"] = (available_devices[4])
+                        device["port1_user"] = available_devices[6]
+                        device["port2_user"] = available_devices[7]
                         device["ip"] = available_devices[5]
                 else:
                     available_devices = cursor.execute(
@@ -285,6 +293,8 @@ def get_group_name(auditorium):
         return "KK-224"
     elif auditorium == 344:
         return "KK-344"
+    elif auditorium == 411:
+        return "KK-411"
     else:
         return "group_unknown"
 
@@ -367,7 +377,6 @@ def add_trunk_vlan_task(device_group, group_name, interface_name, vlan, encapsul
             'parents': f"interface {interface_name}",
             'lines': [
                 f"switchport access vlan {vlan}",
-                f"switchport trunk encapsulation {encapsulation}",
                 "switchport mode dot1q-tunnel",
                 "no cdp enable"
             ],
