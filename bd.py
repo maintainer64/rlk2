@@ -25,8 +25,10 @@ def create_and_populate_database(db_filename="test.db"):
                 status TEXT,
                 port1 TEXT,
                 port2 TEXT,
-                groups_id INTEGER DEFAULT NULL,
-                ip TEXT
+                groups_id TEXT DEFAULT NULL,
+                ip TEXT,
+                port1_user TEXT,
+                port2_user TEXT
             )
         """)
         print("Таблица 'components' успешно создана.")
@@ -34,22 +36,28 @@ def create_and_populate_database(db_filename="test.db"):
                CREATE TABLE IF NOT EXISTS vlan_config (
                    vlan INTEGER,
                    switchport TEXT,
-                   groups_id INTEGER DEFAULT NULL,
+                   groups_id TEXT DEFAULT NULL,
                    audience INTEGER DEFAULT NULL,
-                   connection TEXT                   
+                   connection TEXT
                )
            """)
         print("Таблица 'vlan_config' успешно создана.")
 
         # 2. Заполнение таблицы данными
         data = [
-            (1, 'Switch', 344, 'Cisco', 'Free', 'Fa1/0/36', 'Fa1/0/37', None, "10.20.121.21"),
-            (4, 'Switch', 224, 'Cisco', 'Free', 'Fa0/20', 'Fa0/21', None, "10.20.121.21"),
-            (5, 'Router', 344, 'Cisco', 'Free', 'Fa1/0/32', 'Fa1/0/33', None, "10.20.121.21"),
-            (6, 'Router', 224, 'Cisco', 'Free', 'Fa0/11', 'Fa0/12', None, "10.20.121.21"),
-
-            (7, 'PC', 71, None, 'Free', 71, None, None, "10.20.121.21"),
-            (8, 'PC', 72, None, 'Free', 72, None, None, "10.20.121.21"),
+            (1, 'Switch', 344, 'Huawei', 'Free', 'f1/0/6', 'f1/0/8', None, "10.40.83.2:2039", 'f0/5', 'f0/7'),
+            (2, 'Switch', 344, 'Huawei', 'Free', 'f1/0/5', 'f1/0/7', None, "10.40.83.2:2040", 'f0/1', 'f0/3'),
+            (3, 'Switch', 344, 'Cisco', 'Free', 'f1/0/1', 'f1/0/3', '1', "10.40.83.2:2036", 'f0/1', 'f0/3'),
+            (4, 'Switch', 344, 'Cisco', 'Free', 'f1/0/2', 'f1/0/4', '2', "10.40.83.2:2034", 'f0/2', 'f0/4'),
+            (5, 'Router', 344, 'Cisco', 'Free', 'f1/0/9', 'f1/0/11', None, "10.40.83.2:2041", 'f0/0', 'f0/1'),
+            (6, 'Switch', 224, 'Cisco', 'Free', 'f0/1', 'f0/3', None, "10.40.68.3:2016", 'f0/1', 'f0/3'),
+            (7, 'Switch', 224, 'Cisco', 'Free', 'f0/5', 'f0/7', None, "10.40.68.3:2018", 'f0/1', 'f0/3'),
+            (8, 'Switch', 411, 'Cisco', 'Free', 'f0/1', 'f0/3', None, "10.40.131.224:2067", 'f0/1', 'f0/3'),
+            (9, 'Router', 411, 'Cisco', 'Free', 'f0/5', 'f0/7', None, "10.40.131.224:2068", 'f0/0', 'f0/1'),
+            (10, 'PC', 123, None, 'Free', 123, None, None, "pnet3.at.urfu.ru:30083", None, None),
+            (11, 'PC', 125, None, 'Free', 125, None, None, "pnet3.at.urfu.ru:30084", None, None),
+            (12, 'PC', 225, None, 'Free', 225, None, None, "pnet3.at.urfu.ru:30086", None, None),
+            (13, 'PC', 223, None, 'Free', 223, None, None, "pnet3.at.urfu.ru:30093", None, None),
 
         ]
 
