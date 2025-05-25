@@ -36,7 +36,7 @@ def create_iframe_workbooks(iframe_url) -> str:
         overflow: hidden;
         }}
     </style>
-    <iframe src="${iframe_url}" positionable="true" style="
+    <iframe src="{iframe_url}" positionable="true" style="
         position: relative;
         top: 0;
         left: 0;
