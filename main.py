@@ -2,7 +2,7 @@ import io
 import os
 import sqlite3
 import subprocess
-from typing import List, Dict, Tuple, Union
+from typing import Dict, Union, List, Tuple
 
 import matplotlib.colors as mcolors
 import yaml
@@ -96,7 +96,7 @@ def load_lab_config(lab_number):
         return config['labs'][lab_key]
 
 
-def run_lab(lab_number, group_id, vendor="Any") -> bytes | None:
+def run_lab(lab_number, group_id, manual_url="", vendor="Any") -> bytes | None:
     """Запускает указанную лабораторную работу"""
     lab_config = load_lab_config(lab_number)
     devices = lab_config['devices']
@@ -124,6 +124,7 @@ def run_lab(lab_number, group_id, vendor="Any") -> bytes | None:
     content = generate_unl_from_template(
         template_path=f"templates/{lab_number}.html",
         lab_name="MyLab",
+        manual_url=manual_url,
         telnet_links=telnet_links,
         interface_mapping=interface_mapping,
         debug=True
@@ -189,12 +190,14 @@ def update_bd(devices, group_id) -> bool:
                 if device["device_type"] != 'PC':
                     if device["vendor"] != "Any":
                         available_devices = cursor.execute(
-                             """SELECT COUNT(*), component_id, location,port1,port2,ip,port1_user,port2_user FROM components
-                            WHERE component_type=? AND model=? and status=?
-                            ORDER BY RANDOM() 
-                            LIMIT 1
-                            """, (device["device_type"], "Free")).fetchone()
-                         device["hosts"] = (available_devices[2])
+                            """SELECT COUNT(*), component_id, location,port1,port2,ip,port1_user,port2_user FROM components
+                           WHERE component_type=? AND model=? and status=?
+                           ORDER BY RANDOM() 
+                           LIMIT 1
+                           """,
+                            (device["device_type"], "Free")
+                        ).fetchone()
+                        device["hosts"] = (available_devices[2])
                         device["port1"] = (available_devices[3])
                         device["port2"] = (available_devices[4])
                         device["port1_user"] = available_devices[6]
@@ -243,6 +246,8 @@ def update_bd(devices, group_id) -> bool:
 
 
 def run_playbook():
+    if os.getenv("ANSIBLE_DISABLE") == 'true':
+        return
     # Запуск playbook с inventory и переменными
     result = run_ansible_playbook(
         playbook_path="vlan_playbook.yaml",
@@ -589,6 +594,7 @@ def api_run_lab():
         lab_number = data.get('lab_number')
         vendor = data.get('vendor')
         group_id = data.get('group_id')
+        manual_url = data.get('manual_url')
 
         with sqlite3.connect(db_filename) as conn:
             content_file_unl = unl_file_content_get(conn, group_id)
@@ -610,7 +616,7 @@ def api_run_lab():
                 'status': 'error',
                 'message': 'lab_number is required'
             }), 400
-        unl_file = run_lab(lab_number, group_id, vendor or "Any")
+        unl_file = run_lab(lab_number, group_id, manual_url or "", vendor or "Any")
         if not unl_file:
             return jsonify({
                 'status': 'error',

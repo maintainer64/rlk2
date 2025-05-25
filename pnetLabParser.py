@@ -25,7 +25,34 @@ def debug_log(message: str, params: TemplateParams) -> None:
         print(f"[DEBUG] {message}")
 
 
-def create_lab_xml(lab_name: str, physical_topology_base64: str) -> bytes:
+def create_iframe_workbooks(iframe_url) -> str:
+    if not iframe_url:
+        return ""
+    inject_html = f"""
+    <style>
+        .wb-body .ck-content.box_padding{{
+        height: 100%;
+        padding: 0;
+        overflow: hidden;
+        }}
+    </style>
+    <iframe src="${iframe_url}" positionable="true" style="
+        position: relative;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        z-index: 9999;
+      " frameborder="0" allowfullscreen></iframe>
+    """
+    return base64.b64encode(inject_html.encode("utf-8")).decode("utf-8")
+
+
+def create_lab_xml(lab_name: str, physical_topology_base64: str, workbook_base64: str) -> bytes:
     """Создание UNL-файла с топологией"""
     guid = str(uuid.uuid4())
     lab = ET.Element("lab", {
@@ -58,8 +85,16 @@ def create_lab_xml(lab_name: str, physical_topology_base64: str) -> bytes:
     })
     data = ET.SubElement(textobject, "data")
     data.text = physical_topology_base64
-    ET.SubElement(lab, "workbooks")
-
+    workbooks = ET.SubElement(lab, "workbooks")
+    if workbook_base64:
+        textobject = ET.SubElement(workbooks, "workbook", {
+            "id": "Manual",
+            "weight": "0",
+            "type": "html"
+        })
+        content = ET.SubElement(textobject, "content")
+        page = ET.SubElement(content, "page")
+        page.text = workbook_base64
     return ET.tostring(lab, xml_declaration=True, encoding='utf-8')
 
 
@@ -186,6 +221,7 @@ def process_template_html(content: str, params: TemplateParams) -> str:
 def generate_unl_from_template(
         template_path: str,
         lab_name: str,
+        manual_url: str,
         telnet_links: Dict[str, str],
         interface_mapping: List[Dict[str, str]],
         output_dir: str = None,
@@ -197,6 +233,7 @@ def generate_unl_from_template(
     Параметры:
         template_path (str): Путь к HTML шаблону
         lab_name (str): Название лабораторной работы (без расширения)
+        manual_url (str): URL для сервиса методичек лаб
         telnet_links (Dict[str, str]): Словарь с telnet-ссылками в формате {имя_узла: url}
         interface_mapping (List[Dict[str, str]]): Список маппинга интерфейсов
         output_dir (str, optional): Директория для сохранения. По умолчанию - директория шаблона
@@ -225,8 +262,11 @@ def generate_unl_from_template(
     processed_html = process_template_html(html_content, params)
     base64_content = base64.b64encode(clean_html_content(processed_html).encode("utf-8")).decode()
 
+    # Обработка ссылки методички
+    iframe_workbook = create_iframe_workbooks(manual_url)
+
     # Сохранение UNL
-    content = create_lab_xml(lab_name, base64_content)
+    content = create_lab_xml(lab_name, base64_content, iframe_workbook)
 
     if debug:
         debug_html = output_dir / f"{lab_name}_debug.html"
@@ -236,6 +276,7 @@ def generate_unl_from_template(
         output_path.write_bytes(content)
 
     return content
+
 
 def debug_html_output(html_content: str, output_path: Path) -> None:
     """Сохранение отладочного HTML"""
